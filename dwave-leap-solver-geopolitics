@@ -1,0 +1,51 @@
+# Using NetworkX graphic package
+import networkx as nx
+
+# Create a 5 node complete graph (default node labels are indexical from 0)
+G = nx.complete_graph(5)
+
+#Snapshot of relationships between countries as of mid-2016
+G.add_edges_from([(0,1,{'sign':-1})])
+G.add_edges_from([(0,2,{'sign':-1})])
+G.add_edges_from([(0,3,{'sign':1})])
+G.add_edges_from([(0,4,{'sign':1})])
+G.add_edges_from([(1,2,{'sign':1})])
+G.add_edges_from([(1,3,{'sign':-1})])
+G.add_edges_from([(1,4,{'sign':1})])
+G.add_edges_from([(2,3,{'sign':1})])
+G.add_edges_from([(2,4,{'sign':-1})])
+G.add_edges_from([(3,4,{'sign':1})])
+
+#G.add_edges_from([(u, v, {'sign': 2*random.randint(0, 1)-1}) for u, v in G.edges])
+nx.relabel_nodes(G, {0: 'India', 1: 'Pakistan', 2: 'China', 3: 'Russia', 4: 'US'}, copy=False)
+
+# Print the relationships assigned by the current code execution
+print('Friendly relationships: ', [(x, y) for (x, y, sign) in G.edges(data='sign') if (sign == 1)])
+print('Hostile relationships: ', [(x, y) for (x, y, sign) in G.edges(data='sign') if (sign == -1)])
+
+# Setting up solver
+from helpers.solvers import default_solver
+my_solver, my_token = default_solver()
+
+# Select a D-Wave quantum system and handle mapping from problem graph to sampler graph
+from dwave.system.samplers import DWaveSampler
+from dwave.system.composites import EmbeddingComposite
+sampler = EmbeddingComposite(DWaveSampler(solver={'qpu': True}))
+
+# Return a good partition (minimal structural imbalance) and its frustrated edges  
+import dwave_networkx as dnx
+imbalance, bicoloring = dnx.structural_imbalance(G, sampler)
+
+# Mark the returned frustrated edges and node set (color) on the graph 
+for edge in G.edges:
+    G.edges[edge]['frustrated'] = edge in imbalance
+for node in G.nodes:
+    G.nodes[node]['color'] = bicoloring[node]
+
+# Print the relationships for the returned partition
+print('Yellow set: ', [person for (person, color) in bicoloring.items() if (color == 0)])
+print('Blue set: ', [person for (person, color) in bicoloring.items() if (color == 1)])
+print('\nFrustrated relationships: ', list(imbalance.keys()))
+
+from helpers.draw import draw
+draw(G, with_labels=True);
